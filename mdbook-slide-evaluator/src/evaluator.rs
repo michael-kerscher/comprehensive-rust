@@ -126,6 +126,46 @@ impl<'a> Evaluator<'_> {
         })
     }
 
+    /// prepare the webpage for better data uri experience by embedding css
+    fn inline_css(&self, html: &str, file_path: &Path) -> anyhow::Result<String> {
+        // calculate the file uri for the absolute directory path of the file
+        let base_url =
+            Url::from_file_path(&fs::canonicalize(file_path).unwrap()).unwrap();
+        info!("using base url {} for file {:?}", base_url, file_path);
+        let inliner = css_inline::CSSInliner::options()
+            .load_remote_stylesheets(true)
+            .base_url(Some(base_url))
+            .build();
+        Ok(inliner.inline(&html)?)
+    }
+
+    /// the webdriver is used to access a local file by providing the html page
+    /// as a data:// uri. This will modify the original HTML by inlining css.
+    /// after calling this method the webdriver will see the local file as the
+    /// current webpage
+    ///
+    /// hint: this will have problems if images and other local files are
+    /// embedded as links. If you need this, provide a base-url parameter where
+    /// the browser can find the files
+    async fn webdriver_open_file_as_data_uri(
+        &self,
+        filename: &Path,
+    ) -> anyhow::Result<()> {
+        debug!("open local file in webclient: {}", filename.display());
+        // read the file
+        let html_page = fs::read_to_string(filename)?;
+        // inline the css to avoid issues with rendering
+        let html_page = self.inline_css(&html_page, filename)?;
+        // transport the html file (and only that) to the webdriver browser via a
+        // data url
+        let mut data_uri = dataurl::DataUrl::new();
+        data_uri.set_is_base64_encoded(false);
+        data_uri.set_media_type(Some("text/html".to_string()));
+        data_uri.set_data(html_page.as_bytes());
+        self.webclient.goto(&data_uri.to_string()).await?;
+        Ok(())
+    }
+
     /// navigate the webdriver to the given url.
     /// ensure that html_base_url is set before calling this
     /// after this call the webdriver will see the content at the url
@@ -195,8 +235,16 @@ impl<'a> Evaluator<'_> {
     ) -> anyhow::Result<EvaluationResult> {
         debug!("evaluating {:?}", slide);
 
-        let url = self.html_base_url.join(&slide.filename.display().to_string())?;
-        self.webdriver_open_url(&url).await?;
+        if self.html_base_url.scheme() == "data" {
+            // use a data url to open the html file
+            self.webdriver_open_file_as_data_uri(&slide.filename).await?;
+        } else {
+            // there is a regular html_base_url, use it to specify the location of
+            // the html file
+            let url =
+                self.html_base_url.join(&slide.filename.display().to_string())?;
+            self.webdriver_open_url(&url).await?;
+        }
 
         let content_element = self.get_content_element_from_slide().await?;
         let size = self.get_element_coordinates(&content_element).await?;

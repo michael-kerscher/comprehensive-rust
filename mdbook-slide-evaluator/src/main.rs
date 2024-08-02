@@ -33,7 +33,8 @@ struct Args {
     screenshot_dir: Option<PathBuf>,
     /// a base url that is used to render the files (relative to source_dir).
     /// if you mount the slides at source_dir into / in a webdriver docker
-    /// container you can use the default
+    /// container you can use the default. If set to "data://" this will
+    /// provide the full html file (including css files) via data://
     #[arg(long, default_value_t=Url::parse("file:///").unwrap())]
     base_url: Url,
     /// exports to csv file if provided, otherwise to stdout
