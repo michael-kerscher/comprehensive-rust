@@ -39,3 +39,7 @@ runs:
     - name: Install mdbook-course
       run: cargo install --path mdbook-course --locked
       shell: bash
+
+    - name: Install mdbook-slide-evaluator
+      run: cargo install --path mdbook-slide-evaluator --locked
+      shell: bash
