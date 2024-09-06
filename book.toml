@@ -68,6 +68,8 @@ additional-css = [
   "theme/css/speaker-notes.css",
   "theme/css/language-picker.css",
   "theme/css/rtl.css",
+  "theme/redbox.js",
+  "theme/instructor-menu.js",
 ]
 site-url = "/comprehensive-rust/"
 git-repository-url = "https://github.com/google/comprehensive-rust"
